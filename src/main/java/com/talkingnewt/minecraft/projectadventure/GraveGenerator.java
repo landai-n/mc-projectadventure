@@ -1,11 +1,11 @@
 package com.talkingnewt.minecraft.projectadventure;
 
-import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
-import org.bukkit.Location;
-import org.bukkit.World;
+import org.bukkit.*;
+import org.bukkit.block.Block;
+import org.bukkit.block.data.Orientable;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Optional;
 import java.util.Set;
@@ -61,9 +61,29 @@ public class GraveGenerator {
         return knownGraves.stream().min(comparator);
     }
 
+    public boolean isPossibleGround(Block block) {
+        Material[] blacklist = {
+            Material.OAK_LOG, Material.SPRUCE_LOG, Material.BIRCH_LOG, Material.JUNGLE_LOG, Material.ACACIA_LOG, Material.DARK_OAK_LOG, Material.CRIMSON_STEM, Material.WARPED_STEM, Material.AIR
+        };
+
+        if (Arrays.stream(blacklist).anyMatch(material -> material == block.getType())) {
+            return false;
+        }
+
+        if (block.isLiquid()) {
+            return true;
+        }
+
+        if (block.isEmpty() || !block.getType().isSolid() || !block.getType().isOccluding()) {
+            return false;
+        }
+
+        return true;
+    }
+
     public int findGroundY(Chunk chunk) {
         for (int y = chunk.getWorld().getMaxHeight() - 1; y > 0; --y) {
-            if (!chunk.getBlock(0, y, 0).isEmpty()) {
+            if (isPossibleGround(chunk.getBlock(0, y, 0))) {
                 return y;
             }
         }
@@ -73,7 +93,7 @@ public class GraveGenerator {
 
     public void generate(Chunk originChunk) {
         m_isGenerating = true;
-        Location graveLocation = new Location(originChunk.getWorld(), originChunk.getX() * 16, findGroundY(originChunk), originChunk.getZ() * 16);
+        Location graveLocation = new Location(originChunk.getWorld(), originChunk.getX() * 16, findGroundY(originChunk) + 1, originChunk.getZ() * 16);
         m_structGenerator.generate(graveLocation);
         Bukkit.getLogger().info("New grave generated at " + graveLocation.toString());
         m_isGenerating = false;

@@ -45,6 +45,8 @@ public class Graves implements Listener {
     private void addGrave(World world, Location location) {
         Set<Location> graves = worldGraves(world);
 
+        Bukkit.getLogger().info("Found grave at " + location.toString());
+
         graves.add(location);
         m_graves.put(world.getName(), graves);
     }
@@ -66,18 +68,6 @@ public class Graves implements Listener {
         }
 
         graveLocation(chunk).ifPresent(location -> addGrave(chunk.getWorld(), location));
-    }
-
-    @EventHandler
-    public void onChunkUnload(@NotNull ChunkUnloadEvent event) {
-        final var chunk = event.getChunk();
-
-        final var graves = worldGraves(chunk.getWorld());
-        if (graves.isEmpty()) {
-            return;
-        }
-
-        graveLocation(chunk).ifPresent(graves::remove);
     }
 
     public Optional<Location> graveLocation(@NotNull Chunk chunk) {
@@ -103,6 +93,10 @@ public class Graves implements Listener {
         return knownGraves.stream().min(comparator);
     }
 
+    public Location calculateRespawnPoint(Location location) {
+        return new Location(location.getWorld(), location.getX(), location.getY() - 3, location.getZ() - 3);
+    }
+
     @EventHandler
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         final var player = event.getPlayer();
@@ -110,9 +104,9 @@ public class Graves implements Listener {
 
         if (graveLocationOpt.isPresent()) {
             Bukkit.getLogger().info("Teleport player to nearest grave at: " + graveLocationOpt.get().toString());
-            event.setRespawnLocation(graveLocationOpt.get());
+            event.setRespawnLocation(calculateRespawnPoint(graveLocationOpt.get()));
         } else {
-            Bukkit.getLogger().info("No grave found, teleport player to spawn");
+            Bukkit.getLogger().info("No grave found, teleport player to spawn (" + worldGraves(player.getWorld()).size() + " graves loaded in this world)");
             event.setRespawnLocation(player.getWorld().getSpawnLocation());
         }
     }
