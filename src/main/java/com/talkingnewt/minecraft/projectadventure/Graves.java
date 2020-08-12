@@ -4,18 +4,19 @@ import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
-import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
-import org.bukkit.event.world.ChunkUnloadEvent;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Stream;
 
 public class Graves implements Listener {
-    final private Map<String, Set<Location>> m_graves = new HashMap<>();
-    GraveGenerator m_generator = new GraveGenerator();
+    final private Set<Location> m_graveLocations;
+    final GraveGenerator m_generator = new GraveGenerator();
+    final ReentrantLock m_lock = new ReentrantLock();
 
     public static class DistanceToPlayerComparator implements Comparator<Location> {
         final private Player m_player;
@@ -38,20 +39,13 @@ public class Graves implements Listener {
         }
     }
 
-    private Set<Location> worldGraves(World world) {
-        return m_graves.computeIfAbsent(world.getName(), s -> new HashSet<>());
-    }
+    public Graves(Set<Location> gravesLocations) {
+        m_graveLocations = gravesLocations;
 
-    private void addGrave(World world, Location location) {
-        Set<Location> graves = worldGraves(world);
+        for (Location m_grave : m_graveLocations) {
+            Bukkit.getLogger().info("Load grave at " + m_grave.toString());
+        }
 
-        Bukkit.getLogger().info("Found grave at " + location.toString());
-
-        graves.add(location);
-        m_graves.put(world.getName(), graves);
-    }
-
-    public Graves() {
         if (m_generator.load()) {
             Bukkit.getLogger().warning("Loaded grave generator.");
         } else {
@@ -61,54 +55,71 @@ public class Graves implements Listener {
 
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
+        if (!m_generator.isLoaded()) {
+            return;
+        }
+
+        if (!m_lock.tryLock()) {
+            return;
+        }
+
         final var chunk = event.getChunk();
 
-        if (event.isNewChunk() && m_generator.shouldGenerate(chunk, worldGraves(chunk.getWorld()))) {
-            m_generator.generate(chunk);
+        if (event.isNewChunk() && m_generator.shouldGenerate(chunk, m_graveLocations)) {
+            var placeHolder = new Location(chunk.getWorld(), chunk.getX() * 16, 0, chunk.getZ() * 16);
+            m_graveLocations.add(placeHolder); //todo remove this shit
+            m_lock.unlock();
+            m_generator.generate(chunk).ifPresent(m_graveLocations::add);
+            m_graveLocations.remove(placeHolder);
+        } else {
+            m_lock.unlock();
         }
-
-        graveLocation(chunk).ifPresent(location -> addGrave(chunk.getWorld(), location));
     }
 
-    public Optional<Location> graveLocation(@NotNull Chunk chunk) {
-        for (int x = 0; x < 16; ++x) {
-            for (int y = 0; y < chunk.getWorld().getMaxHeight(); ++y) {
-                for (int z = 0; z < 16; ++z) {
-                    if (chunk.getBlock(x, y, z).getType() == Material.DRAGON_HEAD) {
-                        return Optional.of(chunk.getBlock(x, y, z).getLocation());
-                    }
-                }
-            }
-        }
-
-        return Optional.empty();
+    private Stream<Location> worldGraveLocations(World world) {
+        return m_graveLocations.stream().filter(location -> world == location.getWorld());
     }
 
-    public Optional<Location> nearestGrave(Player player, Set<Location> knownGraves) {
+    private Optional<Location> nearestGrave(Player player) {
         DistanceToPlayerComparator comparator = new DistanceToPlayerComparator(player);
 
-        for (Location knownGrave : knownGraves) {
-            Bukkit.getLogger().info("Player " + player.getLocation().toString() + " grave " + knownGrave.toString());
-        }
-        return knownGraves.stream().min(comparator);
+        return worldGraveLocations(player.getWorld()).min(comparator);
     }
 
-    public Location calculateRespawnPoint(Location location) {
+    private Location calculateRespawnPoint(Location location) {
         return new Location(location.getWorld(), location.getX(), location.getY() - 3, location.getZ() - 3);
     }
 
     @EventHandler
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         final var player = event.getPlayer();
-        final var graveLocationOpt = nearestGrave(player, worldGraves(player.getWorld()));
+        final var graveLocationOpt = nearestGrave(player);
 
         if (graveLocationOpt.isPresent()) {
-            Bukkit.getLogger().info("Teleport player to nearest grave at: " + graveLocationOpt.get().toString());
+            Bukkit.getLogger().info("Teleport " + player.getName()  + " to " + graveLocationOpt.get().toString());
             event.setRespawnLocation(calculateRespawnPoint(graveLocationOpt.get()));
         } else {
-            Bukkit.getLogger().info("No grave found, teleport player to spawn (" + worldGraves(player.getWorld()).size() + " graves loaded in this world)");
+            Bukkit.getLogger().info("No grave found, teleport "  + player.getName()  +  " to spawn.");
             event.setRespawnLocation(player.getWorld().getSpawnLocation());
         }
+    }
+
+    @EventHandler
+    public void onBlockBreak(BlockBreakEvent event) {
+        m_lock.lock();
+        if (m_graveLocations.stream().anyMatch(location -> location.getChunk() == event.getBlock().getChunk())) {
+            event.setCancelled(true);
+        }
+        m_lock.unlock();
+    }
+
+    @EventHandler
+    public void onBlockPlace(BlockPlaceEvent event) {
+        m_lock.lock();
+        if (m_graveLocations.stream().anyMatch(location -> location.getChunk() == event.getBlock().getChunk())) {
+            event.setCancelled(true);
+        }
+        m_lock.unlock();
     }
 
 }

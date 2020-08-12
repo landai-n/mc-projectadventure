@@ -2,4 +2,4 @@ name: ProjectAdventure
 version: 0.1
 api-version: 1.16
 main: com.talkingnewt.minecraft.projectadventure.ProjectAdventure
-load: STARTUP
+#load: STARTUP
