@@ -3,7 +3,6 @@ package com.talkingnewt.minecraft.projectadventure;
 import com.talkingnewt.minecraft.projectadventure.helpers.Coordinates;
 import org.bukkit.*;
 import org.bukkit.block.Block;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
@@ -44,7 +43,7 @@ public class GraveGenerator {
         return (int) Math.round(distance);
     }
 
-    public boolean shouldGenerate(Chunk originChunk, @NotNull Set<Location> knownGraves) {
+    public boolean shouldGenerate(Chunk originChunk, Set<Location> knownGraves) {
         var nearestGraveLocationOpt = nearestGraveLocation(originChunk, knownGraves);
 
         if (originChunk.getWorld().getEnvironment() == World.Environment.NORMAL) {
@@ -108,8 +107,8 @@ public class GraveGenerator {
                 int worldX = Coordinates.ChunkRelative.x_toWorld(chunk, chunkX);
                 int worldZ = Coordinates.ChunkRelative.z_toWorld(chunk, chunkZ);
 
-                int highestBlockY = 128;//chunk.getWorld().getHighestBlockYAt(new Location(chunk.getWorld(), worldX, 256, worldZ));
-                for (int y = highestBlockY; y > 1; --y) {
+                int highestBlockY = chunk.getWorld().getHighestBlockYAt(new Location(chunk.getWorld(), worldX, 256, worldZ));
+                for (int y = highestBlockY; y > chunk.getWorld().getSeaLevel(); --y) {
                     var block = chunk.getBlock(chunkX, y, chunkZ);
                     var groundBlock = chunk.getBlock(chunkX, y - 1, chunkZ);
                     if (isPossibleGround(dimensions, groundBlock.getLocation()) && hasEnoughSpace(dimensions, block.getLocation())) {

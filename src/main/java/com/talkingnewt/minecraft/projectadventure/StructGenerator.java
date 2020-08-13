@@ -3,7 +3,6 @@ package com.talkingnewt.minecraft.projectadventure;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -37,7 +36,7 @@ public class StructGenerator {
         }
     }
 
-    public boolean load(@NotNull String id, @NotNull String structFilePath) {
+    public boolean load(String id, String structFilePath) {
         InputStream stream = getClass().getClassLoader().getResourceAsStream(structFilePath);
 
         if (stream != null) {

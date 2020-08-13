@@ -1,4 +1,4 @@
-package com.talkingnewt.minecraft.projectadventure.configuration;
+package com.talkingnewt.minecraft.projectadventure.configuration.entities;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -14,11 +14,22 @@ public class GsonLocation implements Serializable {
     public int z;
     public String worldName;
 
+    public GsonLocation(Location location) {
+        this.worldName = Objects.requireNonNull(location.getWorld()).getName();
+        this.x = location.getBlockX();
+        this.y = location.getBlockY();
+        this.z = location.getBlockZ();
+    }
+
     public GsonLocation(String worldName, int x, int y, int z) {
         this.worldName = worldName;
         this.x = x;
         this.y = y;
         this.z = z;
+    }
+
+    public Location toBukkitLocation() {
+        return new Location(Bukkit.getWorld(worldName), x, y, z);
     }
 
     public static Set<Location> fromGson(Set<GsonLocation> gsonLocations) {

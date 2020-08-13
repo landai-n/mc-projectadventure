@@ -1,45 +1,24 @@
 package com.talkingnewt.minecraft.projectadventure;
 
+import com.talkingnewt.minecraft.projectadventure.helpers.DistanceComparator2D;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 
 import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
-public class Graves implements Listener {
+public class GraveManager implements Listener {
     final private Set<Location> m_graveLocations;
     final GraveGenerator m_generator = new GraveGenerator();
     final ReentrantLock m_lock = new ReentrantLock();
 
-    public static class DistanceToPlayerComparator implements Comparator<Location> {
-        final private Player m_player;
-
-        public DistanceToPlayerComparator(Player player) {
-            m_player = player;
-        }
-
-        public int compare(Location a, Location b) {
-            var distA = playerDistance(m_player, a);
-            var distB = playerDistance(m_player, b);
-
-            return Integer.compare(distA, distB);
-        }
-
-        static public int playerDistance(Player player, Location graveLocation) {
-            double distance = Math.abs(Math.sqrt(Math.pow(player.getLocation().getBlockX() - graveLocation.getX(), 2) + Math.pow(player.getLocation().getBlockZ() - graveLocation.getZ(), 2)));
-
-            return (int) Math.round(distance);
-        }
-    }
-
-    public Graves(Set<Location> gravesLocations) {
+    public GraveManager(Set<Location> gravesLocations) {
         m_graveLocations = gravesLocations;
 
         for (Location m_grave : m_graveLocations) {
@@ -80,28 +59,10 @@ public class Graves implements Listener {
         return m_graveLocations.stream().filter(location -> world == location.getWorld());
     }
 
-    private Optional<Location> nearestGrave(Player player) {
-        DistanceToPlayerComparator comparator = new DistanceToPlayerComparator(player);
+    public Optional<Location> nearestGrave(Player player) {
+        DistanceComparator2D comparator = new DistanceComparator2D(player.getLocation());
 
         return worldGraveLocations(player.getWorld()).min(comparator);
-    }
-
-    private Location calculateRespawnPoint(Location location) {
-        return new Location(location.getWorld(), location.getX(), location.getY() - 3, location.getZ() - 3);
-    }
-
-    @EventHandler
-    public void onPlayerRespawn(PlayerRespawnEvent event) {
-        final var player = event.getPlayer();
-        final var graveLocationOpt = nearestGrave(player);
-
-        if (graveLocationOpt.isPresent()) {
-            Bukkit.getLogger().info("Teleport " + player.getName()  + " to " + graveLocationOpt.get().toString());
-            event.setRespawnLocation(calculateRespawnPoint(graveLocationOpt.get()));
-        } else {
-            Bukkit.getLogger().info("No grave found, teleport "  + player.getName()  +  " to spawn.");
-            event.setRespawnLocation(player.getWorld().getSpawnLocation());
-        }
     }
 
     @EventHandler
